@@ -1,831 +1,275 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OW · Steam 账号管理</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>
-/* ── Reset & Vars ─────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    <meta charset="UTF-8">
+    <title>OW 账号管理系统 Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #07090f; --panel: #111722; --line: #2d3748; --accent: #f6ad55;
+            --text-main: #e2e8f0; --text-dim: #718096; --white: #ffffff;
+            --danger: #fc8181; --success: #68d391; --blue: #63b3ed;
+            --tank-color: #63b3ed; --dmg-color: #fc8181; --sup-color: #68d391;
+        }
+        body { background: var(--bg); color: var(--text-main); font-family: 'Barlow Condensed', sans-serif; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-left: 4px solid var(--accent); padding-left: 15px; }
+        h2 { color: var(--accent); font-family: 'Share Tech Mono'; margin: 0; font-size: 24px; }
+        #autoRefreshTag { font-family: 'Share Tech Mono'; font-size: 12px; color: var(--text-dim); }
 
-:root {
-  --bg:        #07090f;
-  --panel:     #0d1118;
-  --panel2:    #111825;
-  --line:      #1a2336;
-  --line2:     #222f45;
-  --accent:    #e8a020;
-  --accent2:   #ff5533;
-  --blue:      #3a8fff;
-  --text:      #b8c8e0;
-  --text-dim:  #445566;
-  --text-mid:  #6a7d94;
-  --white:     #dde8f5;
+        /* 过滤系统 */
+        .filter-section { background: rgba(255,255,255,0.02); padding: 15px; border: 1px solid var(--line); border-radius: 4px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .filter-row { display: flex; gap: 8px; align-items: center; }
+        .filter-label { color: var(--text-dim); font-size: 11px; font-weight: bold; width: 60px; text-transform: uppercase; }
+        .filter-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--line); color: var(--text-dim); padding: 6px 14px; cursor: pointer; border-radius: 2px; font-size: 13px; font-weight: bold; }
+        .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(246,173,85,0.1); }
 
-  --tank:  #5baeff;
-  --dmg:   #ff5050;
-  --sup:   #40d080;
+        /* 表格样式 */
+        .card { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: rgba(255,255,255,0.03); color: var(--text-dim); text-align: left; padding: 12px 15px; font-size: 12px; text-transform: uppercase; }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--line); font-size: 14px; }
 
-  --bronze:   #cd7f32;
-  --silver:   #a8b8c8;
-  --gold:     #f0c040;
-  --plat:     #88c0e8;
-  --diamond:  #60d0ff;
-  --master:   #cc66ff;
-}
+        .status-select { background: #000; color: var(--success); border: 1px solid var(--success); padding: 4px 8px; border-radius: 2px; font-family: 'Share Tech Mono'; cursor: pointer; font-size: 12px; }
+        .status-select.busy { color: var(--danger); border-color: var(--danger); }
 
-html, body { height: 100%; }
+        .btn-group { display: flex; gap: 6px; }
+        .btn { background: transparent; border: 1px solid var(--line); color: var(--text-main); padding: 5px 10px; cursor: pointer; font-family: 'Barlow Condensed'; font-weight: 700; border-radius: 2px; font-size: 12px; }
+        .btn-copy-acc { border-color: var(--blue); color: var(--blue); }
+        .btn-copy-pwd { border-color: var(--accent); color: var(--accent); }
+        .btn-edit { border-color: var(--text-dim); color: var(--text-dim); }
+        
+        .toolbar { margin-top: 20px; display: flex; gap: 12px; }
+        .btn-main { background: var(--accent); color: #000; border: none; padding: 10px 20px; font-size: 15px; font-weight: bold; cursor: pointer; }
+        .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 10px 20px; font-size: 15px; font-weight: bold; cursor: pointer; }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 15px;
-  line-height: 1.4;
-  overflow-x: hidden;
-}
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: var(--panel); border: 1px solid var(--accent); padding: 25px; width: 380px; }
+        .modal-content input, .modal-content select { width: 100%; background: #000; border: 1px solid var(--line); color: #fff; padding: 10px; margin: 8px 0; box-sizing: border-box; }
 
-/* ── Scanline texture overlay ─────────────────── */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,0.08) 2px,
-    rgba(0,0,0,0.08) 4px
-  );
-  pointer-events: none;
-  z-index: 9999;
-}
-
-/* ── Layout ───────────────────────────────────── */
-.app {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 16px 40px;
-}
-
-/* ── Header ───────────────────────────────────── */
-.header {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 20px 0 0;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 16px;
-}
-
-.header-logo {
-  font-size: 11px;
-  font-family: 'Share Tech Mono', monospace;
-  color: var(--accent);
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  border: 1px solid var(--accent);
-  padding: 5px 10px;
-  margin-right: 20px;
-  position: relative;
-}
-.header-logo::before {
-  content: '';
-  position: absolute;
-  top: -4px; left: -4px;
-  width: 6px; height: 6px;
-  background: var(--accent);
-}
-
-.header-title {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--white);
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  line-height: 1;
-}
-
-.header-sub {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 1px;
-  margin-top: 3px;
-}
-
-.header-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
-}
-
-.status-pill {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
-  border: 1px solid var(--line2);
-  border-radius: 2px;
-  color: var(--text-dim);
-}
-
-.status-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--text-dim);
-  flex-shrink: 0;
-}
-.status-dot.live {
-  background: var(--sup);
-  box-shadow: 0 0 8px var(--sup);
-  animation: pulse 2s ease-in-out infinite;
-}
-.status-dot.err { background: var(--dmg); }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-/* refresh countdown ring */
-.refresh-ring {
-  position: relative;
-  width: 28px; height: 28px;
-  flex-shrink: 0;
-}
-.refresh-ring svg {
-  width: 28px; height: 28px;
-  transform: rotate(-90deg);
-}
-.refresh-ring circle {
-  fill: none;
-  stroke: var(--line2);
-  stroke-width: 2.5;
-}
-.refresh-ring .progress {
-  stroke: var(--accent);
-  stroke-dasharray: 75.4;
-  stroke-dashoffset: 0;
-  transition: stroke-dashoffset 1s linear;
-}
-.refresh-ring .label {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  color: var(--accent);
-}
-
-
-
-/* ── Summary bar ──────────────────────────────── */
-.summary {
-  display: flex;
-  gap: 1px;
-  margin-bottom: 16px;
-  background: var(--line);
-}
-
-.summary-cell {
-  flex: 1;
-  background: var(--panel);
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.summary-cell .s-label {
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: var(--text-dim);
-  text-transform: uppercase;
-}
-.summary-cell .s-val {
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--white);
-  line-height: 1;
-}
-.summary-cell.in-use .s-val { color: var(--dmg); }
-.summary-cell.free .s-val { color: var(--sup); }
-
-/* ── Table ────────────────────────────────────── */
-.table-wrap {
-  border: 1px solid var(--line);
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-thead tr {
-  background: var(--panel2);
-  border-bottom: 1px solid var(--line2);
-}
-
-th {
-  padding: 10px 14px;
-  text-align: left;
-  font-size: 10px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-tbody tr {
-  border-bottom: 1px solid var(--line);
-  transition: background 0.12s;
-  animation: rowIn 0.3s ease both;
-}
-
-@keyframes rowIn {
-  from { opacity: 0; transform: translateX(-6px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-tbody tr:last-child { border-bottom: none; }
-tbody tr:hover { background: rgba(255,255,255,0.018); }
-
-tbody tr.in-use-row {
-  background: rgba(255,50,30,0.04);
-}
-tbody tr.in-use-row:hover {
-  background: rgba(255,50,30,0.07);
-}
-
-td {
-  padding: 11px 14px;
-  vertical-align: middle;
-}
-
-/* ID cell */
-.cell-id {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 13px;
-  color: var(--white);
-  min-width: 140px;
-}
-
-/* Rank badge */
-.rank {
-  display: inline-block;
-  padding: 2px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  border-left: 2px solid transparent;
-}
-.rank-unranked   { color: var(--text-dim); }
-.rank-bronze     { color: var(--bronze);  border-color: var(--bronze); background: rgba(205,127,50,0.08); }
-.rank-silver     { color: var(--silver);  border-color: var(--silver); background: rgba(168,184,200,0.08); }
-.rank-gold       { color: var(--gold);    border-color: var(--gold);   background: rgba(240,192,64,0.08); }
-.rank-platinum   { color: var(--plat);    border-color: var(--plat);   background: rgba(136,192,232,0.08); }
-.rank-diamond    { color: var(--diamond); border-color: var(--diamond);background: rgba(96,208,255,0.08); }
-.rank-master     { color: var(--master);  border-color: var(--master); background: rgba(204,102,255,0.08); }
-.rank-provisional { opacity: 0.7; font-style: italic; }
-.rank-inprogress { animation: blink 2s ease-in-out infinite; }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
-
-/* Account cell */
-.cell-acc {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
-  color: var(--text);
-  white-space: nowrap;
-}
-
-/* Action buttons */
-.actions {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  white-space: nowrap;
-}
-
-.act-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  cursor: pointer;
-  border: 1px solid var(--line2);
-  background: transparent;
-  color: var(--text-mid);
-  transition: all 0.15s;
-}
-.act-btn:hover { border-color: var(--accent); color: var(--accent); }
-.act-btn:active { transform: scale(0.96); }
-
-.act-btn.copy-btn:hover { border-color: var(--blue); color: var(--blue); }
-.act-btn.copy-btn.copied {
-  border-color: var(--sup);
-  color: var(--sup);
-}
-
-.act-btn.inuse-btn.active {
-  border-color: var(--dmg);
-  color: var(--dmg);
-  background: rgba(255,85,51,0.08);
-}
-.act-btn.inuse-btn.active:hover {
-  background: rgba(255,85,51,0.15);
-}
-.act-btn.inuse-btn:not(.active):hover {
-  border-color: var(--sup);
-  color: var(--sup);
-}
-
-/* In-use badge in status col */
-.inuse-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-family: 'Share Tech Mono', monospace;
-  letter-spacing: 1px;
-  padding: 2px 8px;
-}
-.inuse-badge.on {
-  color: var(--dmg);
-  border: 1px solid rgba(255,85,51,0.4);
-  background: rgba(255,85,51,0.06);
-}
-.inuse-badge.off {
-  color: var(--text-dim);
-  border: 1px solid var(--line);
-}
-
-/* ── Empty / Loading states ───────────────────── */
-.state-box {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  padding: 64px 20px;
-  text-align: center;
-}
-.state-box .icon {
-  font-size: 40px;
-  margin-bottom: 16px;
-}
-.state-box h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--white);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}
-.state-box p {
-  font-size: 13px;
-  font-family: 'Share Tech Mono', monospace;
-  color: var(--text-dim);
-  line-height: 1.8;
-}
-
-.loader {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 48px;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
-  color: var(--text-dim);
-  letter-spacing: 2px;
-}
-.loader-bar {
-  width: 120px;
-  height: 2px;
-  background: var(--line2);
-  overflow: hidden;
-}
-.loader-bar::after {
-  content: '';
-  display: block;
-  height: 100%;
-  width: 40%;
-  background: var(--accent);
-  animation: slide 1s ease-in-out infinite alternate;
-}
-@keyframes slide { from{transform:translateX(-100%)} to{transform:translateX(350%)} }
-
-/* ── Toast ────────────────────────────────────── */
-.toast {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  background: var(--panel2);
-  border: 1px solid var(--accent);
-  border-left: 3px solid var(--accent);
-  padding: 10px 18px;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
-  color: var(--accent);
-  letter-spacing: 1px;
-  opacity: 0;
-  transform: translateY(8px);
-  transition: all 0.2s;
-  pointer-events: none;
-  z-index: 10000;
-  max-width: 320px;
-}
-.toast.err { border-color: var(--dmg); color: var(--dmg); }
-.toast.ok  { border-color: var(--sup); color: var(--sup); }
-.toast.show { opacity: 1; transform: translateY(0); }
-
-/* ── Scrollbar ────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--line2); }
-::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
-</style>
+        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: var(--accent); color: #000; font-weight: bold; display: none; z-index: 2000; }
+    </style>
 </head>
 <body>
 
-<div class="app">
+<div class="container">
+    <header>
+        <h2>SYSTEM // ACCOUNT MANAGEMENT</h2>
+        <div id="autoRefreshTag">AUTO SYNCING... <span id="timer">10</span>s</div>
+    </header>
+    
+    <div class="filter-section">
+        <div class="filter-row">
+            <div class="filter-label">POSITION</div>
+            <button class="filter-btn active" onclick="setRoleFilter('all', this)">ALL</button>
+            <button class="filter-btn" onclick="setRoleFilter('tank', this)">TANK</button>
+            <button class="filter-btn" onclick="setRoleFilter('dmg', this)">DAMAGE</button>
+            <button class="filter-btn" onclick="setRoleFilter('sup', this)">SUPPORT</button>
+        </div>
+        <div class="filter-row">
+            <div class="filter-label">RANK</div>
+            <button class="filter-btn active" onclick="setRankFilter('all', this)">ALL</button>
+            <button class="filter-btn" onclick="setRankFilter('bronze', this)">BRONZE</button>
+            <button class="filter-btn" onclick="setRankFilter('silver', this)">SILVER</button>
+            <button class="filter-btn" onclick="setRankFilter('gold', this)">GOLD</button>
+            <button class="filter-btn" onclick="setRankFilter('platinum', this)">PLATINUM</button>
+            <button class="filter-btn" onclick="setRankFilter('diamond', this)">DIAMOND</button>
+            <button class="filter-btn" onclick="setRankFilter('master', this)">MASTER</button>
+        </div>
+    </div>
+    
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>游戏 ID</th>
+                    <th>TANK / DMG / SUP</th>
+                    <th>快捷操作</th>
+                    <th>状态 (使用者)</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="header-logo">OW</div>
-    <div>
-      <div class="header-title">Steam Account Manager</div>
-      <div class="header-sub">守望先锋 · 账号管理系统</div>
+    <div class="toolbar">
+        <button class="btn-main" onclick="openModal('addModal')">+ 添加新账号</button>
+        <button class="btn-danger" onclick="openDeleteModal()">× 删除账号</button>
+        <button class="btn" onclick="openUserModal()" style="color:var(--text-dim); margin-left:auto">👥 成员管理</button>
     </div>
-    <div class="header-right">
-      <div class="status-pill">
-        <div class="status-dot" id="statusDot"></div>
-        <span id="statusText">未连接</span>
-      </div>
-      <!-- Refresh countdown ring -->
-      <div class="refresh-ring" id="refreshRing" title="距下次自动刷新" style="display:none">
-        <svg viewBox="0 0 28 28">
-          <circle cx="14" cy="14" r="12"/>
-          <circle class="progress" id="ringProgress" cx="14" cy="14" r="12"/>
-        </svg>
-        <div class="label" id="ringLabel">60</div>
-      </div>
-    </div>
-  </header>
-
-  <!-- Summary -->
-  <div class="summary" id="summary" style="display:none">
-    <div class="summary-cell">
-      <div class="s-label">总账号</div>
-      <div class="s-val" id="sTotal">0</div>
-    </div>
-    <div class="summary-cell in-use">
-      <div class="s-label">使用中</div>
-      <div class="s-val" id="sInUse">0</div>
-    </div>
-    <div class="summary-cell free">
-      <div class="s-label">空闲</div>
-      <div class="s-val" id="sFree">0</div>
-    </div>
-    <div class="summary-cell" style="flex:2">
-      <div class="s-label">上次更新</div>
-      <div class="s-val" style="font-size:16px; color:var(--text-mid)" id="sTime">—</div>
-    </div>
-  </div>
-
-  <!-- Table -->
-  <div id="tableArea">
-    <div class="state-box">
-      <div class="icon">🎮</div>
-      <h3>正在连接</h3>
-      <p>正在加载账号数据，请稍候…</p>
-    </div>
-  </div>
-
 </div>
 
-<!-- Toast -->
-<div class="toast" id="toast"></div>
+<div id="deleteModal" class="modal">
+    <div class="modal-content" style="border-color:var(--danger)">
+        <h3 style="color:var(--danger); margin-top:0">DELETE ACCOUNT</h3>
+        <select id="delSelect"></select>
+        <div style="display:flex; gap:10px; margin-top:15px">
+            <button class="btn-main" style="flex:1; background:var(--danger)" onclick="submitDelete()">确认删除</button>
+            <button class="btn" onclick="closeModal('deleteModal')" style="color:#fff">取消</button>
+        </div>
+    </div>
+</div>
+
+<div id="editRankModal" class="modal">
+    <div class="modal-content">
+        <h3 style="color:var(--accent); margin-top:0">UPDATE RANKS</h3>
+        <p id="editIdDisplay" style="color:var(--white); font-weight:bold; margin-bottom:10px"></p>
+        <input type="hidden" id="editRowIndex">
+        <input type="text" id="editTank" placeholder="TANK">
+        <input type="text" id="editDmg" placeholder="DAMAGE">
+        <input type="text" id="editSup" placeholder="SUPPORT">
+        <div style="display:flex; gap:10px; margin-top:15px">
+            <button class="btn-main" style="flex:1" onclick="submitRankUpdate()">保存</button>
+            <button class="btn" onclick="closeModal('editRankModal')" style="color:#fff">取消</button>
+        </div>
+    </div>
+</div>
+
+<div id="addModal" class="modal">
+    <div class="modal-content">
+        <h3 style="color:var(--accent); margin-top:0">ADD NEW</h3>
+        <input type="text" id="inId" placeholder="游戏 ID">
+        <input type="text" id="inTank" placeholder="坦克段位">
+        <input type="text" id="inDmg" placeholder="输出段位">
+        <input type="text" id="inSup" placeholder="辅助段位">
+        <input type="text" id="inAcc" placeholder="账号">
+        <input type="text" id="inPwd" placeholder="密码">
+        <div style="display:flex; gap:10px; margin-top:15px">
+            <button class="btn-main" style="flex:1" onclick="submitAdd()">提交</button>
+            <button class="btn" onclick="closeModal('addModal')" style="color:#fff">取消</button>
+        </div>
+    </div>
+</div>
+
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <h3 style="color:var(--accent); margin-top:0">MEMBERS</h3>
+        <input type="text" id="inUserList" placeholder="名字逗号隔开">
+        <div style="display:flex; gap:10px; margin-top:15px">
+            <button class="btn-main" style="flex:1" onclick="submitUsers()">同步</button>
+            <button class="btn" onclick="closeModal('userModal')" style="color:#fff">取消</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
 
 <script>
-// ================================================================
-// CONFIG — 修改这里
-// ================================================================
+    const API_URL = 'https://script.google.com/macros/s/AKfycbypJavMcFmDmp39F5yMXTodlPkS68XH1khmpZiJ-zOtYQGFrESo_Wo-vHlsJfEd_c0T/exec'; 
+    let accounts = [], users = [], currentRawUsers = "";
+    let roleFilter = 'all', rankFilter = 'all';
+    let countdown = 10; // 核心修改点：初始设为 10 秒
 
-// 【必填】将 Code.gs 部署为 Web App 后，把部署 URL 粘贴到这里
-// 部署步骤：Apps Script → 部署 → 新建部署 → 类型「Web 应用」
-//           执行身份：「我」 / 访问权限：「所有人」
-// 每次修改 Code.gs 后须重新部署（版本选「新建版本」）并更新此 URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbypJavMcFmDmp39F5yMXTodlPkS68XH1khmpZiJ-zOtYQGFrESo_Wo-vHlsJfEd_c0T/exec';
+    async function load(silent = false) {
+        if(!silent) document.getElementById('timer').textContent = "...";
+        jsonp(`${API_URL}?action=getAll`, (res) => {
+            accounts = res.data;
+            users = res.users;
+            currentRawUsers = res.rawUserStr;
+            render();
+            if(!silent) countdown = 10; // 加载后重置
+        });
+    }
 
-// 自动刷新间隔（秒）
-const REFRESH_INTERVAL = 60;
+    // 自动刷新逻辑
+    setInterval(() => {
+        countdown--;
+        if(countdown <= 0) {
+            countdown = 10; // 周期重置
+            load(true);
+        }
+        document.getElementById('timer').textContent = countdown;
+    }, 1000);
 
-// ================================================================
-// STATE — 运行时状态，勿修改
-// ================================================================
-let apiUrl = API_URL;
-let accounts = [];
-let refreshTimer = null;
-let countdownTimer = null;
-let countdown = REFRESH_INTERVAL;
-let pendingInUse = new Set(); // 正在写回 Sheets 的行索引集合
+    function render() {
+        const body = document.getElementById('tableBody');
+        const filtered = accounts.filter(acc => {
+            if (roleFilter === 'all' && rankFilter === 'all') return true;
+            const targetCols = (roleFilter === 'all') ? ['tank', 'dmg', 'sup'] : [roleFilter];
+            return targetCols.some(col => {
+                let val = String(acc[col] || '').trim().toLowerCase();
+                if (!val || val === 'unranked' || val === '—') return false;
+                if (val.includes('(') || val.includes(')')) return false;
+                if (rankFilter !== 'all' && !val.includes(rankFilter)) return false;
+                return true;
+            });
+        });
+        body.innerHTML = filtered.map(acc => `
+            <tr>
+                <td style="font-weight:700; color:white">${acc.id}</td>
+                <td>
+                    <span style="color:var(--tank-color)">${acc.tank}</span> / 
+                    <span style="color:var(--dmg-color)">${acc.dmg}</span> / 
+                    <span style="color:var(--sup-color)">${acc.sup}</span>
+                </td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn btn-copy-acc" onclick="copy('${acc.acc}', '账号')">账号</button>
+                        <button class="btn btn-copy-pwd" onclick="copy('${acc.pwd}', '密码')">密码</button>
+                        <button class="btn btn-edit" onclick="openEditModal(${acc.rowIndex})">修改</button>
+                    </div>
+                </td>
+                <td>
+                    <select class="status-select ${acc.status!=='Free'?'busy':''}" onchange="updateStatus(${acc.rowIndex}, this.value)">
+                        <option value="Free" ${acc.status==='Free'?'selected':''}>🟢 FREE</option>
+                        ${users.map(u => `<option value="${u}" ${acc.status===u?'selected':''}>🔴 ${u}</option>`).join('')}
+                    </select>
+                </td>
+            </tr>
+        `).join('');
+    }
 
-// ── Rank parsing ───────────────────────────────
-function parseRank(raw) {
-  const s = String(raw || '').trim();
-  if (!s || s.toLowerCase() === 'unranked') return { html: '<span class="rank rank-unranked">—</span>', tier: '' };
-
-  let isProvisional = /^[\(（].*[\)）]$/.test(s);
-  let isInProgress  = /^-.*-$/.test(s);
-  let inner = isProvisional ? s.slice(1, -1) : isInProgress ? s.slice(1, -1) : s;
-  const low = inner.toLowerCase();
-
-  let cls = '';
-  if      (low.includes('bronze'))                       cls = 'rank-bronze';
-  else if (low.includes('sliver') || low.includes('silver')) cls = 'rank-silver';
-  else if (low.includes('gold'))                         cls = 'rank-gold';
-  else if (low.includes('platinum') || low.includes('plat')) cls = 'rank-platinum';
-  else if (low.includes('diamond'))                      cls = 'rank-diamond';
-  else if (low.includes('master') || low.includes('grand')) cls = 'rank-master';
-
-  const extras = [cls, isProvisional ? 'rank-provisional' : '', isInProgress ? 'rank-inprogress' : ''].filter(Boolean).join(' ');
-  const prefix = isInProgress ? '▸ ' : isProvisional ? '◈ ' : '';
-  return { html: `<span class="rank ${extras}">${prefix}${esc(inner)}</span>`, tier: cls };
-}
-
-// ── Render ─────────────────────────────────────
-function render() {
-  if (!accounts.length) {
-    document.getElementById('tableArea').innerHTML = `
-      <div class="state-box">
-        <div class="icon">📭</div>
-        <h3>没有数据</h3>
-        <p>表格中未找到账号数据，请检查 Sheet 标签名和表头格式。</p>
-      </div>`;
-    return;
-  }
-
-  const rows = accounts.map((acc, i) => {
-    const inUse = acc.inUse;
-    const pending = pendingInUse.has(acc.rowIndex);
-    const tank = parseRank(acc.tank).html;
-    const dmg  = parseRank(acc.damage).html;
-    const sup  = parseRank(acc.support).html;
-
-    return `<tr class="${inUse ? 'in-use-row' : ''}" id="row-${i}">
-      <td><span class="cell-id">${esc(acc.id)}</span></td>
-      <td>${tank}</td>
-      <td>${dmg}</td>
-      <td>${sup}</td>
-      <td class="cell-acc">${esc(acc.account)}</td>
-      <td>
-        <div class="inuse-badge ${inUse ? 'on' : 'off'}">
-          <span>${inUse ? '● IN USE' : '○ FREE'}</span>
-        </div>
-      </td>
-      <td>
-        <div class="actions">
-          <button class="act-btn copy-btn" onclick="copyAccount(${i})" id="copy-${i}">
-            ⧉ 复制账密
-          </button>
-          <button class="act-btn inuse-btn ${inUse ? 'active' : ''}"
-            onclick="toggleInUse(${i})"
-            id="inuse-${i}"
-            ${pending ? 'disabled' : ''}>
-            ${pending ? '…' : inUse ? '✕ 释放' : '✓ 占用'}
-          </button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-
-  document.getElementById('tableArea').innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>游戏 ID</th>
-            <th style="color:var(--tank)">🛡 坦克</th>
-            <th style="color:var(--dmg)">⚔ 输出</th>
-            <th style="color:var(--sup)">💚 辅助</th>
-            <th>账号</th>
-            <th>状态</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
-
-  // Summary
-  const total  = accounts.length;
-  const inUseN = accounts.filter(a => a.inUse).length;
-  document.getElementById('sTotal').textContent = total;
-  document.getElementById('sInUse').textContent = inUseN;
-  document.getElementById('sFree').textContent  = total - inUseN;
-  document.getElementById('sTime').textContent  = new Date().toLocaleTimeString('zh-CN');
-  document.getElementById('summary').style.display = 'flex';
-}
-
-// ── Copy account + password ────────────────────
-function copyAccount(i) {
-  const acc = accounts[i];
-  const text = `${acc.account}\n${acc.password}`;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById(`copy-${i}`);
-    btn.textContent = '✓ 已复制';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.textContent = '⧉ 复制账密';
-      btn.classList.remove('copied');
-    }, 2000);
-  }).catch(() => toast('复制失败，请手动复制', 'err'));
-}
-
-
-// ── JSONP helpers ──────────────────────────────
-// Apps Script Web App 的 fetch/XHR 请求会被浏览器 CORS 策略拦截，
-// 根本原因：Google 的重定向链会丢失 Access-Control-Allow-Origin 头。
-// 解决方案：JSONP —— 动态注入 <script> 标签，绕过同源限制。
-// Apps Script 侧需要读取 callback 参数并用 callback(json) 格式输出。
-
-function jsonp(url, timeout = 10000) {
-  return new Promise((resolve, reject) => {
-    const cbName = '__owCb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const script = document.createElement('script');
-
-    const timer = setTimeout(() => {
-      _jsonpCleanup(script, cbName);
-      reject(new Error('请求超时'));
-    }, timeout);
-
-    window[cbName] = function(data) {
-      clearTimeout(timer);
-      _jsonpCleanup(script, cbName);
-      resolve(data);
-    };
-
-    script.onerror = function() {
-      clearTimeout(timer);
-      _jsonpCleanup(script, cbName);
-      reject(new Error('脚本加载失败，请确认 Apps Script 已部署且访问权限为「所有人」'));
-    };
-
-    // 拼接 callback 参数名到 URL
-    const sep = url.includes('?') ? '&' : '?';
-    script.src = `${url}${sep}callback=${cbName}&t=${Date.now()}`;
-    document.head.appendChild(script);
-  });
-}
-
-function _jsonpCleanup(script, cbName) {
-  if (script && script.parentNode) script.parentNode.removeChild(script);
-  delete window[cbName];
-}
-
-// ── Fetch data ─────────────────────────────────
-function fetchData(silent = false) {
-  if (!apiUrl) return;
-  if (!silent) {
-    document.getElementById('tableArea').innerHTML = `
-      <div class="loader">
-        <div class="loader-bar"></div>
-        <span>LOADING DATA...</span>
-      </div>`;
-  }
-
-  jsonp(`${apiUrl}?action=getAll`)
-    .then(json => {
-      if (!json.ok) throw new Error(json.error || 'Bad response');
-      accounts = json.data;
-      setStatus('live', `已连接 · ${accounts.length} 个账号`);
-      render();
-    })
-    .catch(e => {
-      if (!silent) {
-        document.getElementById('tableArea').innerHTML = `
-          <div class="state-box">
-            <div class="icon">⚠️</div>
-            <h3>加载失败</h3>
-            <p>${esc(e.message)}</p>
-          </div>`;
-      }
-      setStatus('err', '连接失败');
-      if (!silent) toast('加载失败：' + e.message, 'err');
-    });
-}
-
-// ── Toggle In Use ──────────────────────────────
-// 写操作同样用 JSONP GET，参数直接编进 URL query string。
-// Apps Script doGet 的 e.parameter 可直接读取所有 query 参数。
-async function toggleInUse(i) {
-  const acc = accounts[i];
-  const newVal = !acc.inUse;
-
-  pendingInUse.add(acc.rowIndex);
-  render();
-
-  try {
-    const json = await jsonp(`${apiUrl}?action=setInUse&rowIndex=${acc.rowIndex}&inUse=${newVal}`);
-    if (!json.ok) throw new Error(json.error || 'Unknown error');
-    accounts[i].inUse = newVal;
-    toast(newVal ? `已标记「${acc.id}」为使用中` : `已释放「${acc.id}」`, 'ok');
-  } catch (e) {
-    toast('更新失败：' + e.message, 'err');
-  } finally {
-    pendingInUse.delete(acc.rowIndex);
-    render();
-  }
-}
-
-
-// ── Auto refresh ───────────────────────────────
-function startAutoRefresh() {
-  clearInterval(refreshTimer);
-  clearInterval(countdownTimer);
-
-  document.getElementById('refreshRing').style.display = 'flex';
-  resetCountdown();
-
-  refreshTimer = setInterval(() => {
-    fetchData(true);
-    resetCountdown();
-  }, REFRESH_INTERVAL * 1000);
-}
-
-function resetCountdown() {
-  countdown = REFRESH_INTERVAL;
-  updateRing();
-  clearInterval(countdownTimer);
-  countdownTimer = setInterval(() => {
-    countdown--;
-    if (countdown < 0) countdown = 0;
-    updateRing();
-  }, 1000);
-}
-
-function updateRing() {
-  const circumference = 75.4;
-  const offset = circumference * (1 - countdown / REFRESH_INTERVAL);
-  document.getElementById('ringProgress').style.strokeDashoffset = offset;
-  document.getElementById('ringLabel').textContent = countdown;
-}
-
-// ── Status ─────────────────────────────────────
-function setStatus(state, text) {
-  const dot  = document.getElementById('statusDot');
-  const span = document.getElementById('statusText');
-  dot.className = `status-dot ${state}`;
-  span.textContent = text;
-}
-
-// ── Toast ──────────────────────────────────────
-let toastTimer;
-function toast(msg, type = '') {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = `toast ${type} show`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
-}
-
-// ── Helpers ────────────────────────────────────
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// ── Init — 页面加载后自动连接，无需用户操作 ───────
-(function init() {
-  // 检查占位符是否已替换
-  if (API_URL.includes('REPLACE_WITH_YOUR_DEPLOYMENT_ID')) {
-    document.getElementById('tableArea').innerHTML = `
-      <div class="state-box">
-        <div class="icon">⚙️</div>
-        <h3>待配置</h3>
-        <p>请在 index.html 顶部 CONFIG 区域<br>将 API_URL 替换为实际的 Apps Script 部署 URL。</p>
-      </div>`;
-    setStatus('err', '未配置 API URL');
-    return;
-  }
-  // URL 已配置，直接启动
-  startAutoRefresh();
-  fetchData(false);
-})();
+    // 操作函数
+    function submitDelete() {
+        const idx = document.getElementById('delSelect').value;
+        const idT = document.getElementById('delSelect').selectedOptions[0].text;
+        if(confirm(`永久删除 [${idT}]？`)) {
+            jsonp(`${API_URL}?action=delete&rowIndex=${idx}`, () => { closeModal('deleteModal'); msg('已删除'); load(); });
+        }
+    }
+    function openDeleteModal() {
+        document.getElementById('delSelect').innerHTML = accounts.map(a => `<option value="${a.rowIndex}">${a.id}</option>`).join('');
+        openModal('deleteModal');
+    }
+    function submitRankUpdate() {
+        const row = document.getElementById('editRowIndex').value;
+        const t = encodeURIComponent(document.getElementById('editTank').value);
+        const d = encodeURIComponent(document.getElementById('editDmg').value);
+        const s = encodeURIComponent(document.getElementById('editSup').value);
+        jsonp(`${API_URL}?action=updateRanks&rowIndex=${row}&tank=${t}&dmg=${d}&sup=${s}`, () => { closeModal('editRankModal'); msg('已更新'); load(); });
+    }
+    function openEditModal(idx) {
+        const acc = accounts.find(a => a.rowIndex === idx);
+        document.getElementById('editIdDisplay').textContent = acc.id;
+        document.getElementById('editRowIndex').value = idx;
+        document.getElementById('editTank').value = acc.tank;
+        document.getElementById('editDmg').value = acc.dmg;
+        document.getElementById('editSup').value = acc.sup;
+        openModal('editRankModal');
+    }
+    function updateStatus(idx, u) { jsonp(`${API_URL}?action=updateStatus&rowIndex=${idx}&user=${encodeURIComponent(u)}`, () => { msg('同步成功'); load(true); }); }
+    function submitAdd() {
+        const p = `action=add&id=${el('inId')}&tank=${el('inTank')}&dmg=${el('inDmg')}&sup=${el('inSup')}&acc=${el('inAcc')}&pwd=${el('inPwd')}`;
+        jsonp(`${API_URL}?${p}`, () => { closeModal('addModal'); msg('添加成功'); load(); });
+    }
+    function submitUsers() { jsonp(`${API_URL}?action=updateUsers&userList=${encodeURIComponent(document.getElementById('inUserList').value)}`, () => { closeModal('userModal'); msg('名单已更新'); load(); }); }
+    
+    // 工具类
+    function setRoleFilter(r, b) { roleFilter = r; b.parentElement.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); render(); }
+    function setRankFilter(r, b) { rankFilter = r; b.parentElement.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); render(); }
+    function copy(t, type) { navigator.clipboard.writeText(t); msg(type + ' 已复制'); }
+    function msg(t) { const el = document.getElementById('toast'); el.textContent = t; el.style.display = 'block'; setTimeout(() => el.style.display='none', 2000); }
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function openUserModal() { document.getElementById('inUserList').value = currentRawUsers; openModal('userModal'); }
+    function el(id) { return encodeURIComponent(document.getElementById(id).value); }
+    function jsonp(url, cb) {
+        const n = 'cb' + Date.now() + Math.floor(Math.random()*1000);
+        window[n] = (d) => { cb(d); document.getElementById(n).remove(); delete window[n]; };
+        const s = document.createElement('script'); s.id = n; s.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + n; document.body.appendChild(s);
+    }
+    load();
 </script>
 </body>
 </html>
