@@ -657,23 +657,92 @@ function copyAccount(i) {
   }).catch(() => toast('复制失败，请手动复制', 'err'));
 }
 
+
+// ── JSONP helpers ──────────────────────────────
+// Apps Script Web App 的 fetch/XHR 请求会被浏览器 CORS 策略拦截，
+// 根本原因：Google 的重定向链会丢失 Access-Control-Allow-Origin 头。
+// 解决方案：JSONP —— 动态注入 <script> 标签，绕过同源限制。
+// Apps Script 侧需要读取 callback 参数并用 callback(json) 格式输出。
+
+function jsonp(url, timeout = 10000) {
+  return new Promise((resolve, reject) => {
+    const cbName = '__owCb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+
+    const timer = setTimeout(() => {
+      _jsonpCleanup(script, cbName);
+      reject(new Error('请求超时'));
+    }, timeout);
+
+    window[cbName] = function(data) {
+      clearTimeout(timer);
+      _jsonpCleanup(script, cbName);
+      resolve(data);
+    };
+
+    script.onerror = function() {
+      clearTimeout(timer);
+      _jsonpCleanup(script, cbName);
+      reject(new Error('脚本加载失败，请确认 Apps Script 已部署且访问权限为「所有人」'));
+    };
+
+    // 拼接 callback 参数名到 URL
+    const sep = url.includes('?') ? '&' : '?';
+    script.src = `${url}${sep}callback=${cbName}&t=${Date.now()}`;
+    document.head.appendChild(script);
+  });
+}
+
+function _jsonpCleanup(script, cbName) {
+  if (script && script.parentNode) script.parentNode.removeChild(script);
+  delete window[cbName];
+}
+
+// ── Fetch data ─────────────────────────────────
+function fetchData(silent = false) {
+  if (!apiUrl) return;
+  if (!silent) {
+    document.getElementById('tableArea').innerHTML = `
+      <div class="loader">
+        <div class="loader-bar"></div>
+        <span>LOADING DATA...</span>
+      </div>`;
+  }
+
+  jsonp(`${apiUrl}?action=getAll`)
+    .then(json => {
+      if (!json.ok) throw new Error(json.error || 'Bad response');
+      accounts = json.data;
+      setStatus('live', `已连接 · ${accounts.length} 个账号`);
+      render();
+    })
+    .catch(e => {
+      if (!silent) {
+        document.getElementById('tableArea').innerHTML = `
+          <div class="state-box">
+            <div class="icon">⚠️</div>
+            <h3>加载失败</h3>
+            <p>${esc(e.message)}</p>
+          </div>`;
+      }
+      setStatus('err', '连接失败');
+      if (!silent) toast('加载失败：' + e.message, 'err');
+    });
+}
+
 // ── Toggle In Use ──────────────────────────────
+// 写操作同样用 JSONP GET，参数直接编进 URL query string。
+// Apps Script doGet 的 e.parameter 可直接读取所有 query 参数。
 async function toggleInUse(i) {
   const acc = accounts[i];
   const newVal = !acc.inUse;
 
   pendingInUse.add(acc.rowIndex);
-  render(); // show spinner state
+  render();
 
   try {
-    const res = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' }, // avoid CORS preflight
-      body: JSON.stringify({ action: 'setInUse', rowIndex: acc.rowIndex, inUse: newVal })
-    });
-    const json = await res.json();
+    const json = await jsonp(`${apiUrl}?action=setInUse&rowIndex=${acc.rowIndex}&inUse=${newVal}`);
     if (!json.ok) throw new Error(json.error || 'Unknown error');
-
     accounts[i].inUse = newVal;
     toast(newVal ? `已标记「${acc.id}」为使用中` : `已释放「${acc.id}」`, 'ok');
   } catch (e) {
@@ -684,40 +753,6 @@ async function toggleInUse(i) {
   }
 }
 
-// ── Fetch data ─────────────────────────────────
-async function fetchData(silent = false) {
-  if (!apiUrl) return;
-  if (!silent) {
-    document.getElementById('tableArea').innerHTML = `
-      <div class="loader">
-        <div class="loader-bar"></div>
-        <span>LOADING DATA...</span>
-      </div>`;
-  }
-
-  try {
-    const res  = await fetch(`${apiUrl}?action=getAll&t=${Date.now()}`);
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error || 'Bad response');
-
-    accounts = json.data;
-    setStatus('live', `已连接 · ${accounts.length} 个账号`);
-    render();
-  } catch (e) {
-    if (!silent) {
-      document.getElementById('tableArea').innerHTML = `
-        <div class="state-box">
-          <div class="icon">⚠️</div>
-          <h3>加载失败</h3>
-          <p>${esc(e.message)}<br><br>
-          请检查 Apps Script URL 是否正确，<br>
-          以及部署时「访问权限」是否设为「所有人」。</p>
-        </div>`;
-    }
-    setStatus('err', '连接失败');
-    toast('刷新失败：' + e.message, 'err');
-  }
-}
 
 // ── Auto refresh ───────────────────────────────
 function startAutoRefresh() {
