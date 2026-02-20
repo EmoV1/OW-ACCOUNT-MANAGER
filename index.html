@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OW · Steam 账号管理</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Vars ─────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #07090f;
+  --panel:     #0d1118;
+  --panel2:    #111825;
+  --line:      #1a2336;
+  --line2:     #222f45;
+  --accent:    #e8a020;
+  --accent2:   #ff5533;
+  --blue:      #3a8fff;
+  --text:      #b8c8e0;
+  --text-dim:  #445566;
+  --text-mid:  #6a7d94;
+  --white:     #dde8f5;
+
+  --tank:  #5baeff;
+  --dmg:   #ff5050;
+  --sup:   #40d080;
+
+  --bronze:   #cd7f32;
+  --silver:   #a8b8c8;
+  --gold:     #f0c040;
+  --plat:     #88c0e8;
+  --diamond:  #60d0ff;
+  --master:   #cc66ff;
+}
+
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  overflow-x: hidden;
+}
+
+/* ── Scanline texture overlay ─────────────────── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Layout ───────────────────────────────────── */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+}
+
+/* ── Header ───────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 20px 0 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+.header-logo {
+  font-size: 11px;
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--accent);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  border: 1px solid var(--accent);
+  padding: 5px 10px;
+  margin-right: 20px;
+  position: relative;
+}
+.header-logo::before {
+  content: '';
+  position: absolute;
+  top: -4px; left: -4px;
+  width: 6px; height: 6px;
+  background: var(--accent);
+}
+
+.header-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--white);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.header-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  margin-top: 3px;
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 2px;
+  color: var(--text-dim);
+}
+
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+}
+.status-dot.live {
+  background: var(--sup);
+  box-shadow: 0 0 8px var(--sup);
+  animation: pulse 2s ease-in-out infinite;
+}
+.status-dot.err { background: var(--dmg); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* refresh countdown ring */
+.refresh-ring {
+  position: relative;
+  width: 28px; height: 28px;
+  flex-shrink: 0;
+}
+.refresh-ring svg {
+  width: 28px; height: 28px;
+  transform: rotate(-90deg);
+}
+.refresh-ring circle {
+  fill: none;
+  stroke: var(--line2);
+  stroke-width: 2.5;
+}
+.refresh-ring .progress {
+  stroke: var(--accent);
+  stroke-dasharray: 75.4;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear;
+}
+.refresh-ring .label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--accent);
+}
+
+/* ── Setup panel ──────────────────────────────── */
+.setup-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.setup-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding-top: 8px;
+}
+
+.setup-input {
+  flex: 1;
+  min-width: 260px;
+}
+
+.setup-input input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line2);
+  color: var(--white);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.setup-input input:focus { border-color: var(--accent); }
+.setup-input input::placeholder { color: var(--text-dim); }
+
+.setup-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: 'Share Tech Mono', monospace;
+  margin-top: 5px;
+  line-height: 1.6;
+}
+.setup-hint a { color: var(--blue); }
+
+.btn-primary {
+  background: var(--accent);
+  border: none;
+  color: #000;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  align-self: flex-start;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+.btn-primary:hover { background: #ffb83a; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ── Summary bar ──────────────────────────────── */
+.summary {
+  display: flex;
+  gap: 1px;
+  margin-bottom: 16px;
+  background: var(--line);
+}
+
+.summary-cell {
+  flex: 1;
+  background: var(--panel);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.summary-cell .s-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.summary-cell .s-val {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--white);
+  line-height: 1;
+}
+.summary-cell.in-use .s-val { color: var(--dmg); }
+.summary-cell.free .s-val { color: var(--sup); }
+
+/* ── Table ────────────────────────────────────── */
+.table-wrap {
+  border: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead tr {
+  background: var(--panel2);
+  border-bottom: 1px solid var(--line2);
+}
+
+th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tbody tr {
+  border-bottom: 1px solid var(--line);
+  transition: background 0.12s;
+  animation: rowIn 0.3s ease both;
+}
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(255,255,255,0.018); }
+
+tbody tr.in-use-row {
+  background: rgba(255,50,30,0.04);
+}
+tbody tr.in-use-row:hover {
+  background: rgba(255,50,30,0.07);
+}
+
+td {
+  padding: 11px 14px;
+  vertical-align: middle;
+}
+
+/* ID cell */
+.cell-id {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--white);
+  min-width: 140px;
+}
+
+/* Rank badge */
+.rank {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  border-left: 2px solid transparent;
+}
+.rank-unranked   { color: var(--text-dim); }
+.rank-bronze     { color: var(--bronze);  border-color: var(--bronze); background: rgba(205,127,50,0.08); }
+.rank-silver     { color: var(--silver);  border-color: var(--silver); background: rgba(168,184,200,0.08); }
+.rank-gold       { color: var(--gold);    border-color: var(--gold);   background: rgba(240,192,64,0.08); }
+.rank-platinum   { color: var(--plat);    border-color: var(--plat);   background: rgba(136,192,232,0.08); }
+.rank-diamond    { color: var(--diamond); border-color: var(--diamond);background: rgba(96,208,255,0.08); }
+.rank-master     { color: var(--master);  border-color: var(--master); background: rgba(204,102,255,0.08); }
+.rank-provisional { opacity: 0.7; font-style: italic; }
+.rank-inprogress { animation: blink 2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* Account cell */
+.cell-acc {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* Action buttons */
+.actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.act-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid var(--line2);
+  background: transparent;
+  color: var(--text-mid);
+  transition: all 0.15s;
+}
+.act-btn:hover { border-color: var(--accent); color: var(--accent); }
+.act-btn:active { transform: scale(0.96); }
+
+.act-btn.copy-btn:hover { border-color: var(--blue); color: var(--blue); }
+.act-btn.copy-btn.copied {
+  border-color: var(--sup);
+  color: var(--sup);
+}
+
+.act-btn.inuse-btn.active {
+  border-color: var(--dmg);
+  color: var(--dmg);
+  background: rgba(255,85,51,0.08);
+}
+.act-btn.inuse-btn.active:hover {
+  background: rgba(255,85,51,0.15);
+}
+.act-btn.inuse-btn:not(.active):hover {
+  border-color: var(--sup);
+  color: var(--sup);
+}
+
+/* In-use badge in status col */
+.inuse-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: 'Share Tech Mono', monospace;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+}
+.inuse-badge.on {
+  color: var(--dmg);
+  border: 1px solid rgba(255,85,51,0.4);
+  background: rgba(255,85,51,0.06);
+}
+.inuse-badge.off {
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+}
+
+/* ── Empty / Loading states ───────────────────── */
+.state-box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 64px 20px;
+  text-align: center;
+}
+.state-box .icon {
+  font-size: 40px;
+  margin-bottom: 16px;
+}
+.state-box h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.state-box p {
+  font-size: 13px;
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--text-dim);
+  line-height: 1.8;
+}
+
+.loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 48px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+}
+.loader-bar {
+  width: 120px;
+  height: 2px;
+  background: var(--line2);
+  overflow: hidden;
+}
+.loader-bar::after {
+  content: '';
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: var(--accent);
+  animation: slide 1s ease-in-out infinite alternate;
+}
+@keyframes slide { from{transform:translateX(-100%)} to{transform:translateX(350%)} }
+
+/* ── Toast ────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  background: var(--panel2);
+  border: 1px solid var(--accent);
+  border-left: 3px solid var(--accent);
+  padding: 10px 18px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 1px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.2s;
+  pointer-events: none;
+  z-index: 10000;
+  max-width: 320px;
+}
+.toast.err { border-color: var(--dmg); color: var(--dmg); }
+.toast.ok  { border-color: var(--sup); color: var(--sup); }
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* ── Scrollbar ────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line2); }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-logo">OW</div>
+    <div>
+      <div class="header-title">Steam Account Manager</div>
+      <div class="header-sub">守望先锋 · 账号管理系统</div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">未连接</span>
+      </div>
+      <!-- Refresh countdown ring -->
+      <div class="refresh-ring" id="refreshRing" title="距下次自动刷新" style="display:none">
+        <svg viewBox="0 0 28 28">
+          <circle cx="14" cy="14" r="12"/>
+          <circle class="progress" id="ringProgress" cx="14" cy="14" r="12"/>
+        </svg>
+        <div class="label" id="ringLabel">60</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Setup -->
+  <div class="setup-panel">
+    <div class="setup-label">Apps Script URL</div>
+    <div class="setup-input">
+      <input type="text" id="apiUrl"
+        placeholder="https://script.google.com/macros/s/YOUR_ID/exec" />
+      <div class="setup-hint">
+        将 Code.gs 部署为 Web App 后，粘贴部署 URL。
+        部署时「执行身份」选<b style="color:var(--text)">自己</b>，「访问权限」选<b style="color:var(--text)">所有人</b>。
+      </div>
+    </div>
+    <button class="btn-primary" id="connectBtn" onclick="connect()">连接</button>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary" id="summary" style="display:none">
+    <div class="summary-cell">
+      <div class="s-label">总账号</div>
+      <div class="s-val" id="sTotal">0</div>
+    </div>
+    <div class="summary-cell in-use">
+      <div class="s-label">使用中</div>
+      <div class="s-val" id="sInUse">0</div>
+    </div>
+    <div class="summary-cell free">
+      <div class="s-label">空闲</div>
+      <div class="s-val" id="sFree">0</div>
+    </div>
+    <div class="summary-cell" style="flex:2">
+      <div class="s-label">上次更新</div>
+      <div class="s-val" style="font-size:16px; color:var(--text-mid)" id="sTime">—</div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div id="tableArea">
+    <div class="state-box">
+      <div class="icon">🎮</div>
+      <h3>未连接</h3>
+      <p>输入 Apps Script 部署 URL 并点击「连接」<br>即可加载并管理 Steam 账号</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config ─────────────────────────────────────
+const REFRESH_INTERVAL = 60; // seconds
+
+// ── State ──────────────────────────────────────
+let apiUrl = '';
+let accounts = [];
+let refreshTimer = null;
+let countdownTimer = null;
+let countdown = REFRESH_INTERVAL;
+let pendingInUse = new Set(); // row indices currently being toggled
+
+// ── Rank parsing ───────────────────────────────
+function parseRank(raw) {
+  const s = String(raw || '').trim();
+  if (!s || s.toLowerCase() === 'unranked') return { html: '<span class="rank rank-unranked">—</span>', tier: '' };
+
+  let isProvisional = /^[\(（].*[\)）]$/.test(s);
+  let isInProgress  = /^-.*-$/.test(s);
+  let inner = isProvisional ? s.slice(1, -1) : isInProgress ? s.slice(1, -1) : s;
+  const low = inner.toLowerCase();
+
+  let cls = '';
+  if      (low.includes('bronze'))                       cls = 'rank-bronze';
+  else if (low.includes('sliver') || low.includes('silver')) cls = 'rank-silver';
+  else if (low.includes('gold'))                         cls = 'rank-gold';
+  else if (low.includes('platinum') || low.includes('plat')) cls = 'rank-platinum';
+  else if (low.includes('diamond'))                      cls = 'rank-diamond';
+  else if (low.includes('master') || low.includes('grand')) cls = 'rank-master';
+
+  const extras = [cls, isProvisional ? 'rank-provisional' : '', isInProgress ? 'rank-inprogress' : ''].filter(Boolean).join(' ');
+  const prefix = isInProgress ? '▸ ' : isProvisional ? '◈ ' : '';
+  return { html: `<span class="rank ${extras}">${prefix}${esc(inner)}</span>`, tier: cls };
+}
+
+// ── Render ─────────────────────────────────────
+function render() {
+  if (!accounts.length) {
+    document.getElementById('tableArea').innerHTML = `
+      <div class="state-box">
+        <div class="icon">📭</div>
+        <h3>没有数据</h3>
+        <p>表格中未找到账号数据，请检查 Sheet 标签名和表头格式。</p>
+      </div>`;
+    return;
+  }
+
+  const rows = accounts.map((acc, i) => {
+    const inUse = acc.inUse;
+    const pending = pendingInUse.has(acc.rowIndex);
+    const tank = parseRank(acc.tank).html;
+    const dmg  = parseRank(acc.damage).html;
+    const sup  = parseRank(acc.support).html;
+
+    return `<tr class="${inUse ? 'in-use-row' : ''}" id="row-${i}">
+      <td><span class="cell-id">${esc(acc.id)}</span></td>
+      <td>${tank}</td>
+      <td>${dmg}</td>
+      <td>${sup}</td>
+      <td class="cell-acc">${esc(acc.account)}</td>
+      <td>
+        <div class="inuse-badge ${inUse ? 'on' : 'off'}">
+          <span>${inUse ? '● IN USE' : '○ FREE'}</span>
+        </div>
+      </td>
+      <td>
+        <div class="actions">
+          <button class="act-btn copy-btn" onclick="copyAccount(${i})" id="copy-${i}">
+            ⧉ 复制账密
+          </button>
+          <button class="act-btn inuse-btn ${inUse ? 'active' : ''}"
+            onclick="toggleInUse(${i})"
+            id="inuse-${i}"
+            ${pending ? 'disabled' : ''}>
+            ${pending ? '…' : inUse ? '✕ 释放' : '✓ 占用'}
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableArea').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>游戏 ID</th>
+            <th style="color:var(--tank)">🛡 坦克</th>
+            <th style="color:var(--dmg)">⚔ 输出</th>
+            <th style="color:var(--sup)">💚 辅助</th>
+            <th>账号</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  // Summary
+  const total  = accounts.length;
+  const inUseN = accounts.filter(a => a.inUse).length;
+  document.getElementById('sTotal').textContent = total;
+  document.getElementById('sInUse').textContent = inUseN;
+  document.getElementById('sFree').textContent  = total - inUseN;
+  document.getElementById('sTime').textContent  = new Date().toLocaleTimeString('zh-CN');
+  document.getElementById('summary').style.display = 'flex';
+}
+
+// ── Copy account + password ────────────────────
+function copyAccount(i) {
+  const acc = accounts[i];
+  const text = `${acc.account}\n${acc.password}`;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById(`copy-${i}`);
+    btn.textContent = '✓ 已复制';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '⧉ 复制账密';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => toast('复制失败，请手动复制', 'err'));
+}
+
+// ── Toggle In Use ──────────────────────────────
+async function toggleInUse(i) {
+  const acc = accounts[i];
+  const newVal = !acc.inUse;
+
+  pendingInUse.add(acc.rowIndex);
+  render(); // show spinner state
+
+  try {
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' }, // avoid CORS preflight
+      body: JSON.stringify({ action: 'setInUse', rowIndex: acc.rowIndex, inUse: newVal })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Unknown error');
+
+    accounts[i].inUse = newVal;
+    toast(newVal ? `已标记「${acc.id}」为使用中` : `已释放「${acc.id}」`, 'ok');
+  } catch (e) {
+    toast('更新失败：' + e.message, 'err');
+  } finally {
+    pendingInUse.delete(acc.rowIndex);
+    render();
+  }
+}
+
+// ── Fetch data ─────────────────────────────────
+async function fetchData(silent = false) {
+  if (!apiUrl) return;
+  if (!silent) {
+    document.getElementById('tableArea').innerHTML = `
+      <div class="loader">
+        <div class="loader-bar"></div>
+        <span>LOADING DATA...</span>
+      </div>`;
+  }
+
+  try {
+    const res  = await fetch(`${apiUrl}?action=getAll&t=${Date.now()}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Bad response');
+
+    accounts = json.data;
+    setStatus('live', `已连接 · ${accounts.length} 个账号`);
+    render();
+  } catch (e) {
+    if (!silent) {
+      document.getElementById('tableArea').innerHTML = `
+        <div class="state-box">
+          <div class="icon">⚠️</div>
+          <h3>加载失败</h3>
+          <p>${esc(e.message)}<br><br>
+          请检查 Apps Script URL 是否正确，<br>
+          以及部署时「访问权限」是否设为「所有人」。</p>
+        </div>`;
+    }
+    setStatus('err', '连接失败');
+    toast('刷新失败：' + e.message, 'err');
+  }
+}
+
+// ── Connect ────────────────────────────────────
+function connect() {
+  const val = document.getElementById('apiUrl').value.trim();
+  if (!val) { toast('请输入 Apps Script URL', 'err'); return; }
+  apiUrl = val;
+  localStorage.setItem('ow_api_url', val);
+  startAutoRefresh();
+  fetchData(false);
+}
+
+// ── Auto refresh ───────────────────────────────
+function startAutoRefresh() {
+  clearInterval(refreshTimer);
+  clearInterval(countdownTimer);
+
+  document.getElementById('refreshRing').style.display = 'flex';
+  resetCountdown();
+
+  refreshTimer = setInterval(() => {
+    fetchData(true);
+    resetCountdown();
+  }, REFRESH_INTERVAL * 1000);
+}
+
+function resetCountdown() {
+  countdown = REFRESH_INTERVAL;
+  updateRing();
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    countdown--;
+    if (countdown < 0) countdown = 0;
+    updateRing();
+  }, 1000);
+}
+
+function updateRing() {
+  const circumference = 75.4;
+  const offset = circumference * (1 - countdown / REFRESH_INTERVAL);
+  document.getElementById('ringProgress').style.strokeDashoffset = offset;
+  document.getElementById('ringLabel').textContent = countdown;
+}
+
+// ── Status ─────────────────────────────────────
+function setStatus(state, text) {
+  const dot  = document.getElementById('statusDot');
+  const span = document.getElementById('statusText');
+  dot.className = `status-dot ${state}`;
+  span.textContent = text;
+}
+
+// ── Toast ──────────────────────────────────────
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Helpers ────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Init ───────────────────────────────────────
+(function init() {
+  const saved = localStorage.getItem('ow_api_url');
+  if (saved) {
+    document.getElementById('apiUrl').value = saved;
+    apiUrl = saved;
+    startAutoRefresh();
+    fetchData(false);
+  }
+})();
+</script>
+</body>
+</html>
