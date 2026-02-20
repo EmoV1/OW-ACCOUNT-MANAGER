@@ -187,77 +187,7 @@ body::after {
   color: var(--accent);
 }
 
-/* ── Setup panel ──────────────────────────────── */
-.setup-panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  padding: 18px 20px;
-  margin-bottom: 20px;
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
 
-.setup-label {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px;
-  color: var(--accent);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  white-space: nowrap;
-  padding-top: 8px;
-}
-
-.setup-input {
-  flex: 1;
-  min-width: 260px;
-}
-
-.setup-input input {
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--line2);
-  color: var(--white);
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
-  padding: 8px 12px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-.setup-input input:focus { border-color: var(--accent); }
-.setup-input input::placeholder { color: var(--text-dim); }
-
-.setup-hint {
-  font-size: 11px;
-  color: var(--text-dim);
-  font-family: 'Share Tech Mono', monospace;
-  margin-top: 5px;
-  line-height: 1.6;
-}
-.setup-hint a { color: var(--blue); }
-
-.btn-primary {
-  background: var(--accent);
-  border: none;
-  color: #000;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  padding: 8px 20px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-  align-self: flex-start;
-  margin-top: 0;
-  flex-shrink: 0;
-}
-.btn-primary:hover { background: #ffb83a; transform: translateY(-1px); }
-.btn-primary:active { transform: translateY(0); }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
 /* ── Summary bar ──────────────────────────────── */
 .summary {
@@ -557,20 +487,6 @@ td {
     </div>
   </header>
 
-  <!-- Setup -->
-  <div class="setup-panel">
-    <div class="setup-label">Apps Script URL</div>
-    <div class="setup-input">
-      <input type="text" id="apiUrl"
-        placeholder="https://script.google.com/macros/s/YOUR_ID/exec" />
-      <div class="setup-hint">
-        将 Code.gs 部署为 Web App 后，粘贴部署 URL。
-        部署时「执行身份」选<b style="color:var(--text)">自己</b>，「访问权限」选<b style="color:var(--text)">所有人</b>。
-      </div>
-    </div>
-    <button class="btn-primary" id="connectBtn" onclick="connect()">连接</button>
-  </div>
-
   <!-- Summary -->
   <div class="summary" id="summary" style="display:none">
     <div class="summary-cell">
@@ -595,8 +511,8 @@ td {
   <div id="tableArea">
     <div class="state-box">
       <div class="icon">🎮</div>
-      <h3>未连接</h3>
-      <p>输入 Apps Script 部署 URL 并点击「连接」<br>即可加载并管理 Steam 账号</p>
+      <h3>正在连接</h3>
+      <p>正在加载账号数据，请稍候…</p>
     </div>
   </div>
 
@@ -606,16 +522,28 @@ td {
 <div class="toast" id="toast"></div>
 
 <script>
-// ── Config ─────────────────────────────────────
-const REFRESH_INTERVAL = 60; // seconds
+// ================================================================
+// CONFIG — 修改这里
+// ================================================================
 
-// ── State ──────────────────────────────────────
-let apiUrl = '';
+// 【必填】将 Code.gs 部署为 Web App 后，把部署 URL 粘贴到这里
+// 部署步骤：Apps Script → 部署 → 新建部署 → 类型「Web 应用」
+//           执行身份：「我」 / 访问权限：「所有人」
+// 每次修改 Code.gs 后须重新部署（版本选「新建版本」）并更新此 URL
+const API_URL = 'https://script.google.com/macros/s/REPLACE_WITH_YOUR_DEPLOYMENT_ID/exec';
+
+// 自动刷新间隔（秒）
+const REFRESH_INTERVAL = 60;
+
+// ================================================================
+// STATE — 运行时状态，勿修改
+// ================================================================
+let apiUrl = API_URL;
 let accounts = [];
 let refreshTimer = null;
 let countdownTimer = null;
 let countdown = REFRESH_INTERVAL;
-let pendingInUse = new Set(); // row indices currently being toggled
+let pendingInUse = new Set(); // 正在写回 Sheets 的行索引集合
 
 // ── Rank parsing ───────────────────────────────
 function parseRank(raw) {
@@ -791,16 +719,6 @@ async function fetchData(silent = false) {
   }
 }
 
-// ── Connect ────────────────────────────────────
-function connect() {
-  const val = document.getElementById('apiUrl').value.trim();
-  if (!val) { toast('请输入 Apps Script URL', 'err'); return; }
-  apiUrl = val;
-  localStorage.setItem('ow_api_url', val);
-  startAutoRefresh();
-  fetchData(false);
-}
-
 // ── Auto refresh ───────────────────────────────
 function startAutoRefresh() {
   clearInterval(refreshTimer);
@@ -856,15 +774,22 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ── Init ───────────────────────────────────────
+// ── Init — 页面加载后自动连接，无需用户操作 ───────
 (function init() {
-  const saved = localStorage.getItem('ow_api_url');
-  if (saved) {
-    document.getElementById('apiUrl').value = saved;
-    apiUrl = saved;
-    startAutoRefresh();
-    fetchData(false);
+  // 检查占位符是否已替换
+  if (API_URL.includes('REPLACE_WITH_YOUR_DEPLOYMENT_ID')) {
+    document.getElementById('tableArea').innerHTML = `
+      <div class="state-box">
+        <div class="icon">⚙️</div>
+        <h3>待配置</h3>
+        <p>请在 index.html 顶部 CONFIG 区域<br>将 API_URL 替换为实际的 Apps Script 部署 URL。</p>
+      </div>`;
+    setStatus('err', '未配置 API URL');
+    return;
   }
+  // URL 已配置，直接启动
+  startAutoRefresh();
+  fetchData(false);
 })();
 </script>
 </body>
