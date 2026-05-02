@@ -193,7 +193,7 @@
             .from('accounts')
             .select('*')
             .order('id', { ascending: true });
-            
+        console.log("数据库返回的数据：", data); // 👈 加这一行   
         if (error) {
             console.error("数据加载失败:", error);
             return;
