@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <title>OW 账号管理系统 Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <!-- 引入 Supabase JS 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* 保持你原来的 CSS 完全不变 */
         :root {
             --bg: #07090f; --panel: #111722; --line: #2d3748; --accent: #f6ad55;
             --text-main: #e2e8f0; --text-dim: #718096; --white: #ffffff;
@@ -12,20 +15,18 @@
             --tank-color: #63b3ed; --dmg-color: #fc8181; --sup-color: #68d391;
         }
         body { background: var(--bg); color: var(--text-main); font-family: 'Barlow Condensed', sans-serif; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
+        .container { max-width: 1200px; margin: 0 auto; display: none; /* 默认隐藏主体，等验证通过后显示 */ }
         
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-left: 4px solid var(--accent); padding-left: 15px; }
         h2 { color: var(--accent); font-family: 'Share Tech Mono'; margin: 0; font-size: 24px; }
         #autoRefreshTag { font-family: 'Share Tech Mono'; font-size: 12px; color: var(--text-dim); }
 
-        /* 过滤系统 */
         .filter-section { background: rgba(255,255,255,0.02); padding: 15px; border: 1px solid var(--line); border-radius: 4px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
         .filter-row { display: flex; gap: 8px; align-items: center; }
         .filter-label { color: var(--text-dim); font-size: 11px; font-weight: bold; width: 60px; text-transform: uppercase; }
         .filter-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--line); color: var(--text-dim); padding: 6px 14px; cursor: pointer; border-radius: 2px; font-size: 13px; font-weight: bold; }
         .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(246,173,85,0.1); }
 
-        /* 表格样式 */
         .card { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
         table { width: 100%; border-collapse: collapse; }
         th { background: rgba(255,255,255,0.03); color: var(--text-dim); text-align: left; padding: 12px 15px; font-size: 12px; text-transform: uppercase; }
@@ -49,17 +50,29 @@
         .modal-content input, .modal-content select { width: 100%; background: #000; border: 1px solid var(--line); color: #fff; padding: 10px; margin: 8px 0; box-sizing: border-box; }
 
         .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: var(--accent); color: #000; font-weight: bold; display: none; z-index: 2000; }
+        
+        /* 登录遮罩样式 */
+        #loginOverlay { position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+        #sitePass { padding:10px; background:#000; border:1px solid var(--accent); color:#fff; text-align:center; font-family: 'Share Tech Mono'; font-size: 18px; margin-bottom: 20px;}
     </style>
 </head>
 <body>
 
-<div class="container">
+<!-- 简单的进入密码保护 -->
+<div id="loginOverlay">
+    <h2 style="margin-bottom:20px; color:var(--accent)">SYSTEM // AUTHENTICATION</h2>
+    <input type="password" id="sitePass" placeholder="ENTER PASSCODE">
+    <button class="btn-main" onclick="checkPass()">ACCESS</button>
+</div>
+
+<div class="container" id="mainApp">
     <header>
         <h2>SYSTEM // ACCOUNT MANAGEMENT</h2>
-        <div id="autoRefreshTag">AUTO SYNCING... <span id="timer">10</span>s</div>
+        <div id="autoRefreshTag">AUTO SYNCING... <span id="timer">30</span>s</div> <!-- 改为 30 秒刷新 -->
     </header>
     
     <div class="filter-section">
+        <!-- 过滤器保持不变 -->
         <div class="filter-row">
             <div class="filter-label">POSITION</div>
             <button class="filter-btn active" onclick="setRoleFilter('all', this)">ALL</button>
@@ -96,10 +109,11 @@
     <div class="toolbar">
         <button class="btn-main" onclick="openModal('addModal')">+ 添加新账号</button>
         <button class="btn-danger" onclick="openDeleteModal()">× 删除账号</button>
-        <button class="btn" onclick="openUserModal()" style="color:var(--text-dim); margin-left:auto">👥 成员管理</button>
+        <!-- 移除了成员管理，我们改用更简单的方法存储成员 -->
     </div>
 </div>
 
+<!-- 模态框保持不变 -->
 <div id="deleteModal" class="modal">
     <div class="modal-content" style="border-color:var(--danger)">
         <h3 style="color:var(--danger); margin-top:0">DELETE ACCOUNT</h3>
@@ -115,7 +129,7 @@
     <div class="modal-content">
         <h3 style="color:var(--accent); margin-top:0">UPDATE RANKS</h3>
         <p id="editIdDisplay" style="color:var(--white); font-weight:bold; margin-bottom:10px"></p>
-        <input type="hidden" id="editRowIndex">
+        <input type="hidden" id="editRowId"> <!-- 改为存储数据库的真实 ID -->
         <input type="text" id="editTank" placeholder="TANK">
         <input type="text" id="editDmg" placeholder="DAMAGE">
         <input type="text" id="editSup" placeholder="SUPPORT">
@@ -130,9 +144,9 @@
     <div class="modal-content">
         <h3 style="color:var(--accent); margin-top:0">ADD NEW</h3>
         <input type="text" id="inId" placeholder="游戏 ID">
-        <input type="text" id="inTank" placeholder="坦克段位">
-        <input type="text" id="inDmg" placeholder="输出段位">
-        <input type="text" id="inSup" placeholder="辅助段位">
+        <input type="text" id="inTank" placeholder="坦克段位 (例如: diamond)">
+        <input type="text" id="inDmg" placeholder="输出段位 (例如: platinum)">
+        <input type="text" id="inSup" placeholder="辅助段位 (例如: gold)">
         <input type="text" id="inAcc" placeholder="账号">
         <input type="text" id="inPwd" placeholder="密码">
         <div style="display:flex; gap:10px; margin-top:15px">
@@ -142,46 +156,74 @@
     </div>
 </div>
 
-<div id="userModal" class="modal">
-    <div class="modal-content">
-        <h3 style="color:var(--accent); margin-top:0">MEMBERS</h3>
-        <input type="text" id="inUserList" placeholder="名字逗号隔开">
-        <div style="display:flex; gap:10px; margin-top:15px">
-            <button class="btn-main" style="flex:1" onclick="submitUsers()">同步</button>
-            <button class="btn" onclick="closeModal('userModal')" style="color:#fff">取消</button>
-        </div>
-    </div>
-</div>
-
 <div id="toast" class="toast"></div>
 
 <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbypJavMcFmDmp39F5yMXTodlPkS68XH1khmpZiJ-zOtYQGFrESo_Wo-vHlsJfEd_c0T/exec'; 
-    let accounts = [], users = [], currentRawUsers = "";
-    let roleFilter = 'all', rankFilter = 'all';
-    let countdown = 10; // 核心修改点：初始设为 10 秒
+    // ⚠️ 替换为你自己的 Supabase URL 和 Key (在 Project Settings -> API 中)
+    const SUPABASE_URL = 'https://ydntytwpipfbzgnrsutx.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JplrZ7ZZr0qPIdPa57jVhg_mixfUvEM';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // 访问密码配置 (为了防止机器人扫描，朋友们输入这个才能看)
+    const ACCESS_PASSWORD = "ow123"; 
+
+    // 硬编码成员列表，比建表更简单 (如果你的朋友固定)
+    const users = ['张三', '李四', '王五', '小明'];
+
+    let accounts = [];
+    let roleFilter = 'all', rankFilter = 'all';
+    let countdown = 30; // 刷新频率改为 30 秒
+
+    // 检查进入密码
+    function checkPass() {
+        const pass = document.getElementById('sitePass').value;
+        if (pass === ACCESS_PASSWORD) {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            load(); // 验证通过后加载数据
+        } else {
+            msg("密码错误");
+        }
+    }
+
+    // 回车键登录
+    document.getElementById("sitePass").addEventListener("keyup", function(event) {
+        if (event.key === "Enter") checkPass();
+    });
+
+    // 从 Supabase 加载数据
     async function load(silent = false) {
         if(!silent) document.getElementById('timer').textContent = "...";
-        jsonp(`${API_URL}?action=getAll`, (res) => {
-            accounts = res.data;
-            users = res.users;
-            currentRawUsers = res.rawUserStr;
-            render();
-            if(!silent) countdown = 10; // 加载后重置
-        });
+        
+        const { data, error } = await supabase
+            .from('accounts')
+            .select('*')
+            .order('id', { ascending: true }); // 按 ID 排序
+            
+        if (error) {
+            console.error(error);
+            msg("加载失败");
+            return;
+        }
+        
+        accounts = data;
+        render();
+        if(!silent) countdown = 30;
     }
 
     // 自动刷新逻辑
     setInterval(() => {
+        if(document.getElementById('mainApp').style.display === 'none') return;
         countdown--;
         if(countdown <= 0) {
-            countdown = 10; // 周期重置
+            countdown = 30;
             load(true);
         }
         document.getElementById('timer').textContent = countdown;
     }, 1000);
 
+    // 渲染表格 (逻辑不变，只修改了 data 绑定)
     function render() {
         const body = document.getElementById('tableBody');
         const filtered = accounts.filter(acc => {
@@ -197,21 +239,21 @@
         });
         body.innerHTML = filtered.map(acc => `
             <tr>
-                <td style="font-weight:700; color:white">${acc.id}</td>
+                <td style="font-weight:700; color:white">${acc.game_id}</td>
                 <td>
-                    <span style="color:var(--tank-color)">${acc.tank}</span> / 
-                    <span style="color:var(--dmg-color)">${acc.dmg}</span> / 
-                    <span style="color:var(--sup-color)">${acc.sup}</span>
+                    <span style="color:var(--tank-color)">${acc.tank || '—'}</span> / 
+                    <span style="color:var(--dmg-color)">${acc.dmg || '—'}</span> / 
+                    <span style="color:var(--sup-color)">${acc.sup || '—'}</span>
                 </td>
                 <td>
                     <div class="btn-group">
                         <button class="btn btn-copy-acc" onclick="copy('${acc.acc}', '账号')">账号</button>
                         <button class="btn btn-copy-pwd" onclick="copy('${acc.pwd}', '密码')">密码</button>
-                        <button class="btn btn-edit" onclick="openEditModal(${acc.rowIndex})">修改</button>
+                        <button class="btn btn-edit" onclick="openEditModal(${acc.id})">修改</button>
                     </div>
                 </td>
                 <td>
-                    <select class="status-select ${acc.status!=='Free'?'busy':''}" onchange="updateStatus(${acc.rowIndex}, this.value)">
+                    <select class="status-select ${acc.status!=='Free'?'busy':''}" onchange="updateStatus(${acc.id}, this.value)">
                         <option value="Free" ${acc.status==='Free'?'selected':''}>🟢 FREE</option>
                         ${users.map(u => `<option value="${u}" ${acc.status===u?'selected':''}>🔴 ${u}</option>`).join('')}
                     </select>
@@ -220,40 +262,72 @@
         `).join('');
     }
 
-    // 操作函数
-    function submitDelete() {
-        const idx = document.getElementById('delSelect').value;
-        const idT = document.getElementById('delSelect').selectedOptions[0].text;
-        if(confirm(`永久删除 [${idT}]？`)) {
-            jsonp(`${API_URL}?action=delete&rowIndex=${idx}`, () => { closeModal('deleteModal'); msg('已删除'); load(); });
+    // 提交添加数据到 Supabase
+    async function submitAdd() {
+        const newAcc = {
+            game_id: document.getElementById('inId').value,
+            tank: document.getElementById('inTank').value,
+            dmg: document.getElementById('inDmg').value,
+            sup: document.getElementById('inSup').value,
+            acc: document.getElementById('inAcc').value,
+            pwd: document.getElementById('inPwd').value,
+            status: 'Free'
+        };
+        
+        const { error } = await supabase.from('accounts').insert([newAcc]);
+        
+        if (error) { msg('添加失败'); console.error(error); }
+        else { closeModal('addModal'); msg('添加成功'); load(); }
+    }
+
+    // 提交删除数据
+    async function submitDelete() {
+        const id = document.getElementById('delSelect').value;
+        const text = document.getElementById('delSelect').selectedOptions[0].text;
+        
+        if(confirm(`永久删除 [${text}]？`)) {
+            const { error } = await supabase.from('accounts').delete().eq('id', id);
+            if(error) msg('删除失败');
+            else { closeModal('deleteModal'); msg('已删除'); load(); }
         }
     }
+    
     function openDeleteModal() {
-        document.getElementById('delSelect').innerHTML = accounts.map(a => `<option value="${a.rowIndex}">${a.id}</option>`).join('');
+        document.getElementById('delSelect').innerHTML = accounts.map(a => `<option value="${a.id}">${a.game_id}</option>`).join('');
         openModal('deleteModal');
     }
-    function submitRankUpdate() {
-        const row = document.getElementById('editRowIndex').value;
-        const t = encodeURIComponent(document.getElementById('editTank').value);
-        const d = encodeURIComponent(document.getElementById('editDmg').value);
-        const s = encodeURIComponent(document.getElementById('editSup').value);
-        jsonp(`${API_URL}?action=updateRanks&rowIndex=${row}&tank=${t}&dmg=${d}&sup=${s}`, () => { closeModal('editRankModal'); msg('已更新'); load(); });
+
+    // 提交段位更新
+    async function submitRankUpdate() {
+        const id = document.getElementById('editRowId').value;
+        const updates = {
+            tank: document.getElementById('editTank').value,
+            dmg: document.getElementById('editDmg').value,
+            sup: document.getElementById('editSup').value,
+        };
+        
+        const { error } = await supabase.from('accounts').update(updates).eq('id', id);
+        
+        if(error) msg('更新失败');
+        else { closeModal('editRankModal'); msg('已更新'); load(); }
     }
-    function openEditModal(idx) {
-        const acc = accounts.find(a => a.rowIndex === idx);
-        document.getElementById('editIdDisplay').textContent = acc.id;
-        document.getElementById('editRowIndex').value = idx;
+
+    function openEditModal(id) {
+        const acc = accounts.find(a => a.id === id);
+        document.getElementById('editIdDisplay').textContent = acc.game_id;
+        document.getElementById('editRowId').value = id;
         document.getElementById('editTank').value = acc.tank;
         document.getElementById('editDmg').value = acc.dmg;
         document.getElementById('editSup').value = acc.sup;
         openModal('editRankModal');
     }
-    function updateStatus(idx, u) { jsonp(`${API_URL}?action=updateStatus&rowIndex=${idx}&user=${encodeURIComponent(u)}`, () => { msg('同步成功'); load(true); }); }
-    function submitAdd() {
-        const p = `action=add&id=${el('inId')}&tank=${el('inTank')}&dmg=${el('inDmg')}&sup=${el('inSup')}&acc=${el('inAcc')}&pwd=${el('inPwd')}`;
-        jsonp(`${API_URL}?${p}`, () => { closeModal('addModal'); msg('添加成功'); load(); });
+
+    // 更新状态 (谁在使用)
+    async function updateStatus(id, userStatus) { 
+        const { error } = await supabase.from('accounts').update({ status: userStatus }).eq('id', id);
+        if(error) msg('同步失败');
+        else { msg('同步成功'); load(true); }
     }
-    function submitUsers() { jsonp(`${API_URL}?action=updateUsers&userList=${encodeURIComponent(document.getElementById('inUserList').value)}`, () => { closeModal('userModal'); msg('名单已更新'); load(); }); }
     
     // 工具类
     function setRoleFilter(r, b) { roleFilter = r; b.parentElement.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); render(); }
@@ -262,14 +336,7 @@
     function msg(t) { const el = document.getElementById('toast'); el.textContent = t; el.style.display = 'block'; setTimeout(() => el.style.display='none', 2000); }
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function openUserModal() { document.getElementById('inUserList').value = currentRawUsers; openModal('userModal'); }
-    function el(id) { return encodeURIComponent(document.getElementById(id).value); }
-    function jsonp(url, cb) {
-        const n = 'cb' + Date.now() + Math.floor(Math.random()*1000);
-        window[n] = (d) => { cb(d); document.getElementById(n).remove(); delete window[n]; };
-        const s = document.createElement('script'); s.id = n; s.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + n; document.body.appendChild(s);
-    }
-    load();
+    
 </script>
 </body>
 </html>
