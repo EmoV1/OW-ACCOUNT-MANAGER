@@ -159,20 +159,20 @@
 <div id="toast" class="toast"></div>
 
 <script>
-    // 1. 配置信息 (请确保这里只出现一次)
-    const SUPABASE_URL = 'https://ydntytwpipfbzgnrsutx.supabase.co'; // ⚠️ 替换为你的真实 URL
-    const SUPABASE_KEY = 'sb_publishable_JplrZ7ZZr0qPIdPa57jVhg_mixfUvEM'; // ⚠️ 替换为你的真实 Publishable Key
-    const ACCESS_PASSWORD = "ow123"; // 进入系统的密码
+    // 1. 基础配置
+    const SUPABASE_URL = 'https://ydntytwpipfbzgnrsutx.supabase.co'; 
+    const SUPABASE_KEY = 'sb_publishable_JplrZ7ZZr0qPIdPa57jVhg_mixfUvEM'; 
+    const ACCESS_PASSWORD = "ow123"; 
 
-    // 2. 初始化 Supabase 客户端 (错误源头就在这里，确保只有这一行声明)
+    // 初始化客户端
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const users = ['张三', '李四', '王五', '小明']; // 成员名单
+    const users = ['张三', '李四', '王五', '小明']; 
     let accounts = [];
     let roleFilter = 'all', rankFilter = 'all';
     let countdown = 30;
 
-    // 3. 验证函数
+    // 2. 登录验证
     function checkPass() {
         const passInput = document.getElementById('sitePass');
         if (passInput.value === ACCESS_PASSWORD) {
@@ -184,18 +184,17 @@
         }
     }
 
-    // 4. 数据加载函数
+    // 3. 加载数据 - 确保字段名与数据库小写一致
     async function load(silent = false) {
         if(!silent) document.getElementById('timer').textContent = "...";
         
-        // 注意这里使用的是上面定义的 supabaseClient
         const { data, error } = await supabaseClient
             .from('accounts')
             .select('*')
-            .order('id', { ascending: true });
-        console.log("数据库返回的数据：", data); // 👈 加这一行   
+            .order('id', { ascending: true }); // 使用小写 id
+            
         if (error) {
-            console.error("数据加载失败:", error);
+            console.error("加载失败:", error.message);
             return;
         }
         
@@ -204,16 +203,23 @@
         if(!silent) countdown = 30;
     }
 
-    // 5. 渲染函数
+    // 4. 渲染与筛选逻辑修正
     function render() {
         const body = document.getElementById('tableBody');
         const filtered = accounts.filter(acc => {
             if (roleFilter === 'all' && rankFilter === 'all') return true;
+            
+            // 职责筛选逻辑
             const targetCols = (roleFilter === 'all') ? ['tank', 'dmg', 'sup'] : [roleFilter];
+            
             return targetCols.some(col => {
-                let val = String(acc[col] || '').trim().toLowerCase();
+                let val = String(acc[col] || '').trim().toLowerCase(); // 统一转小写比对
                 if (!val || val === 'unranked' || val === '—') return false;
-                if (rankFilter !== 'all' && !val.includes(rankFilter)) return false;
+                
+                // 段位筛选逻辑
+                if (rankFilter !== 'all') {
+                    return val.includes(rankFilter.toLowerCase());
+                }
                 return true;
             });
         });
@@ -234,16 +240,16 @@
                     </div>
                 </td>
                 <td>
-                    <select class="status-select ${acc.status!=='Free'?'busy':''}" onchange="updateStatus(${acc.id}, this.value)">
-                        <option value="Free" ${acc.status==='Free'?'selected':''}>🟢 FREE</option>
-                        ${users.map(u => `<option value="${u}" ${acc.status===u?'selected':''}>🔴 ${u}</option>`).join('')}
+                    <select class="status-select ${acc.status !== 'Free' ? 'busy' : ''}" onchange="updateStatus(${acc.id}, this.value)">
+                        <option value="Free" ${acc.status === 'Free' ? 'selected' : ''}>🟢 FREE</option>
+                        ${users.map(u => `<option value="${u}" ${acc.status === u ? 'selected' : ''}>🔴 ${u}</option>`).join('')}
                     </select>
                 </td>
             </tr>
         `).join('');
     }
 
-    // --- 其他操作函数 (如 submitAdd, submitDelete 等) 同样放到这里面 ---
+    // 5. 操作函数集 - 关键：全部使用小写 id 匹配
     async function submitAdd() {
         const newAcc = {
             game_id: document.getElementById('inId').value,
@@ -255,15 +261,56 @@
             status: 'Free'
         };
         const { error } = await supabaseClient.from('accounts').insert([newAcc]);
-        if (error) alert('添加失败'); else { closeModal('addModal'); load(); }
+        if (error) alert('添加失败: ' + error.message); else { closeModal('addModal'); load(); }
     }
 
-    // 这里的函数名和 onclick 对应
+    async function submitDelete() {
+        const id = document.getElementById('delSelect').value;
+        if(confirm(`确认删除该账号？`)) {
+            const { error } = await supabaseClient.from('accounts').delete().eq('id', id);
+            if(error) alert('删除失败'); else { closeModal('deleteModal'); load(); }
+        }
+    }
+
+    async function submitRankUpdate() {
+        const id = document.getElementById('editRowId').value;
+        const updates = {
+            tank: document.getElementById('editTank').value,
+            dmg: document.getElementById('editDmg').value,
+            sup: document.getElementById('editSup').value,
+        };
+        const { error } = await supabaseClient.from('accounts').update(updates).eq('id', id);
+        if(error) alert('更新失败'); else { closeModal('editRankModal'); load(); }
+    }
+
+    async function updateStatus(id, userStatus) { 
+        const { error } = await supabaseClient.from('accounts').update({ status: userStatus }).eq('id', id);
+        if(error) alert('状态同步失败'); else load(true);
+    }
+
+    // 6. UI 辅助函数
+    function openEditModal(id) {
+        const acc = accounts.find(a => Number(a.id) === Number(id)); // 确保类型匹配[cite: 1]
+        if(!acc) return;
+        document.getElementById('editIdDisplay').textContent = acc.game_id;
+        document.getElementById('editRowId').value = acc.id;
+        document.getElementById('editTank').value = acc.tank || '';
+        document.getElementById('editDmg').value = acc.dmg || '';
+        document.getElementById('editSup').value = acc.sup || '';
+        openModal('editRankModal');
+    }
+
+    function openDeleteModal() {
+        document.getElementById('delSelect').innerHTML = accounts.map(a => `<option value="${a.id}">${a.game_id}</option>`).join('');
+        openModal('deleteModal');
+    }
+
+    function setRoleFilter(r, b) { roleFilter = r; b.parentElement.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); render(); }
+    function setRankFilter(r, b) { rankFilter = r; b.parentElement.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); render(); }
+    function copy(t, type) { navigator.clipboard.writeText(t); alert(type + ' 已复制'); }
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function copy(t, type) { navigator.clipboard.writeText(t); alert(type + ' 已复制'); }
 
-    // 自动刷新
     setInterval(() => {
         if(document.getElementById('mainApp').style.display === 'none') return;
         countdown--;
