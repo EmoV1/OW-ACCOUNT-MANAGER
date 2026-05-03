@@ -147,14 +147,23 @@
 
 <div id="editRankModal" class="modal">
     <div class="modal-content">
-        <h3 style="color:var(--accent); margin-top:0">UPDATE RANKS</h3>
+        <h3 style="color:var(--accent); margin-top:0">EDIT ACCOUNT</h3> <!-- 标题改得通用一点 -->
         <p id="editIdDisplay" style="color:var(--white); font-weight:bold; margin-bottom:10px"></p>
         <input type="hidden" id="editRowId">
+        
+        <!-- 新增：账号与密码修改 -->
+        <div style="border-bottom: 1px solid var(--line); margin-bottom: 10px; padding-bottom: 5px; color: var(--text-dim); font-size: 12px;">LOGIN INFO</div>
+        <input type="text" id="editAcc" placeholder="ACCOUNT">
+        <input type="text" id="editPwd" placeholder="PASSWORD">
+        
+        <!-- 原有的段位修改 -->
+        <div style="border-bottom: 1px solid var(--line); margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; color: var(--text-dim); font-size: 12px;">RANK INFO</div>
         <input type="text" id="editTank" placeholder="TANK">
         <input type="text" id="editDmg" placeholder="DAMAGE">
         <input type="text" id="editSup" placeholder="SUPPORT">
+        
         <div style="display:flex; gap:10px; margin-top:15px">
-            <button class="btn-main" style="flex:1" onclick="submitRankUpdate()">保存</button>
+            <button class="btn-main" style="flex:1" onclick="submitRankUpdate()">保存全部修改</button>
             <button class="btn" onclick="closeModal('editRankModal')" style="color:#fff">取消</button>
         </div>
     </div>
@@ -283,17 +292,28 @@
         }
     }
 
-    async function submitRankUpdate() {
-        const id = document.getElementById('editRowId').value;
-        const updates = {
-            tank: document.getElementById('editTank').value,
-            dmg: document.getElementById('editDmg').value,
-            sup: document.getElementById('editSup').value,
-        };
-        const { error } = await supabaseClient.from('accounts').update(updates).eq('id', id);
-        if(error) showToast('!! 更新失败'); 
-        else { showToast('>> 段位资料已同步'); closeModal('editRankModal'); load(); }
+   async function submitRankUpdate() {
+    const id = document.getElementById('editRowId').value;
+    const updates = {
+        // 新增账号密码同步
+        acc: document.getElementById('editAcc').value,
+        pwd: document.getElementById('editPwd').value,
+        // 原有段位同步
+        tank: document.getElementById('editTank').value,
+        dmg: document.getElementById('editDmg').value,
+        sup: document.getElementById('editSup').value,
+    };
+    
+    const { error } = await supabaseClient.from('accounts').update(updates).eq('id', id);
+    
+    if(error) {
+        showToast('!! 更新失败: ' + error.message);
+    } else { 
+        showToast('>> 账号资料已全面更新');
+        closeModal('editRankModal'); 
+        load(); 
     }
+}
 
     async function updateStatus(id, userStatus) { 
         const { error } = await supabaseClient.from('accounts').update({ status: userStatus }).eq('id', id);
@@ -302,15 +322,22 @@
     }
 
     function openEditModal(id) {
-        const acc = accounts.find(a => Number(a.id) === Number(id));
-        if(!acc) return;
-        document.getElementById('editIdDisplay').textContent = acc.game_id;
-        document.getElementById('editRowId').value = acc.id;
-        document.getElementById('editTank').value = acc.tank || '';
-        document.getElementById('editDmg').value = acc.dmg || '';
-        document.getElementById('editSup').value = acc.sup || '';
-        openModal('editRankModal');
-    }
+    const acc = accounts.find(a => Number(a.id) === Number(id));
+    if(!acc) return;
+    document.getElementById('editIdDisplay').textContent = acc.game_id;
+    document.getElementById('editRowId').value = acc.id;
+    
+    // 填充账号密码
+    document.getElementById('editAcc').value = acc.acc || '';
+    document.getElementById('editPwd').value = acc.pwd || '';
+    
+    // 填充段位
+    document.getElementById('editTank').value = acc.tank || '';
+    document.getElementById('editDmg').value = acc.dmg || '';
+    document.getElementById('editSup').value = acc.sup || '';
+    
+    openModal('editRankModal');
+}
 
     function openDeleteModal() {
         document.getElementById('delSelect').innerHTML = accounts.map(a => `<option value="${a.id}">${a.game_id}</option>`).join('');
