@@ -7,6 +7,29 @@
     <!-- 引入 Supabase JS 库 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* 吐司提示框基础样式 */
+.toast {
+    position: fixed;
+    top: -50px; /* 初始在屏幕外 */
+    left: 50%;
+    transform: translateX(-50%);
+    background: #4a148c; /* 暗紫色，符合 OW 风格 */
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: bold;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    z-index: 10000;
+    transition: top 0.3s ease-in-out, opacity 0.3s;
+    opacity: 0;
+    pointer-events: none; /* 防止遮挡点击 */
+}
+
+/* 显示时的状态 */
+.toast.show {
+    top: 20px;
+    opacity: 1;
+}
         /* 保持你原来的 CSS 完全不变 */
         :root {
             --bg: #07090f; --panel: #111722; --line: #2d3748; --accent: #f6ad55;
@@ -307,7 +330,11 @@
 
     function setRoleFilter(r, b) { roleFilter = r; b.parentElement.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); render(); }
     function setRankFilter(r, b) { rankFilter = r; b.parentElement.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); render(); }
-    function copy(t, type) { navigator.clipboard.writeText(t); alert(type + ' 已复制'); }
+    function copy(text, type) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast(type + ' 已复制'); // 👈 调用新提示，不再用 alert
+    });
+}
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
@@ -317,6 +344,16 @@
         if(countdown <= 0) { countdown = 30; load(true); }
         document.getElementById('timer').textContent = countdown;
     }, 1000);
+    function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.add('show');
+
+    // 1秒后自动关闭
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 1000);
+}
 </script>
 </body>
 </html>
